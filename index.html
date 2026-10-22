@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualisation des données IAV</title>
+    
+    <!-- Charger le CSS de Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        #map {
+            width: 100%;
+            height: 650px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Carte interactive des données IAV</h1>
+    <div id="map"></div>
+
+    <!-- Charger le JS de Leaflet -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // 1. Initialiser la carte (centrée par exemple sur Rabat/IAV)
+        var map = L.map('map').setView([33.98, -6.86], 15);
+
+        // 2. Ajouter un fond de carte OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // 3. Créer des groupes de couches vides pour chaque fichier
+        var grassLayer = L.layerGroup().addTo(map); // Affiché par défaut
+        var hippodromeLayer = L.layerGroup().addTo(map);
+        var iav3dLayer = L.layerGroup();
+        var pointsLayer = L.layerGroup();
+        var roadsLayer = L.layerGroup().addTo(map);
+
+        // 4. Fonction générique pour charger les fichiers GeoJSON depuis le dossier 'data/'
+        function chargerGeoJSON(url, groupeCouche, styleOptions, isPoint = false) {
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    var geojsonLayer = L.geoJSON(data, {
+                        style: isPoint ? null : styleOptions,
+                        pointToLayer: isPoint ? function (feature, latlng) {
+                            return L.circleMarker(latlng, {
+                                radius: 6,
+                                fillColor: "#ff7800",
+                                color: "#000",
+                                weight: 1,
+                                opacity: 1,
+                                fillOpacity: 0.8
+                            });
+                        } : null,
+                        onEachFeature: function (feature, layer) {
+                            if (feature.properties) {
+                                var popupContent = "<b>Attributs :</b><br>";
+                                for (var key in feature.properties) {
+                                    popupContent += "<i>" + key + "</i>: " + feature.properties[key] + "<br>";
+                                }
+                                layer.bindPopup(popupContent);
+                            }
+                        }
+                    });
+                    geojsonLayer.addTo(groupeCouche);
+                })
+                .catch(error => console.error("Erreur lors du chargement de " + url, error));
+        }
+
+        // 5. Charger chaque fichier de votre dossier data/ avec des styles personnalisés
+        chargerGeoJSON('data/grass.geojson', grassLayer, { color: '#2ecc71', fillColor: '#2ecc71', fillOpacity: 0.5 });
+        chargerGeoJSON('data/Hippodrome_iav.geojson', hippodromeLayer, { color: '#9b59b6', fillColor: '#9b59b6', fillOpacity: 0.3 });
+        chargerGeoJSON('data/iav3D.geojson', iav3dLayer, { color: '#e74c3c', weight: 1, fillOpacity: 0.4 });
+        chargerGeoJSON('data/points_iav.geojson', pointsLayer, null, true); // true indique que ce sont des points
+        chargerGeoJSON('data/roads.geojson', roadsLayer, { color: '#34495e', weight: 3 });
+
+        // 6. Ajouter le widget de contrôle pour activer/désactiver les couches
+        var overlayMaps = {
+            "Espaces verts (Grass)": grassLayer,
+            "Hippodrome": hippodromeLayer,
+            "Modèle 3D (iav3D)": iav3dLayer,
+            "Points d'intérêt": pointsLayer,
+            "Routes": roadsLayer
+        };
+
+        L.control.layers(null, overlayMaps, { collapsed: false }).addTo(map);
+    </script>
+
+</body>
+</html>
